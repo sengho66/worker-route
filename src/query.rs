@@ -11,10 +11,8 @@ use worker::RouteContext;
 /// To extract information from `Request`, `T` must implement `Deserialize` trait.
 ///
 /// # Panics
-/// If there's missing field from the URL query string and if the field
-/// is not an `Option<T>` then it will panic.
-///
-/// # Examples
+/// Currently only regular structs are supported.
+/// If the given `T` is not a regular struct (eg: tuple, unit) it will panic at runtime.
 ///
 /// ```
 /// use serde::{Deserialize, Serialize};
@@ -22,26 +20,25 @@ use worker::RouteContext;
 /// use worker_route::{get, Query};
 ///
 /// #[derive(Debug, Serialize, Deserialize)]
-/// struct Foo {
+/// struct StructFoo {
 ///     foo: String,
 /// }
-/// // "/foo" will panic
-/// // "/foo?foo=foo" will not
-/// #[get("/foo")]
-/// async fn foo(req: Query<Foo>, _: RouteContext<()>) -> Result<Response> {
-///     // call req.into_inner() to access the field
-///     Response::empty()
+///
+/// #[get("/foo-struct")]
+/// async fn struct_foo(req: Query<StructFoo>, _: RouteContext<()>) -> Result<Response> {
+///     // works
+///     let Foo { foo } = req.into_inner();
+///     // rest code
 /// }
 ///
 /// #[derive(Debug, Serialize, Deserialize)]
-/// struct OptionFoo {
-///     foo: Option<String>,
-/// }
+/// struct TupleFoo(String);
 ///
-/// // "/foo" will not panic because foo is an `Option<T>`
-/// #[get("/foo")]
-/// async fn option_foo(req: Query<OptionFoo>, _: RouteContext<()>) -> Result<Response> {
-///     Response::empty()
+/// #[get("/foo-tuple")]
+/// async fn tuple_foo(req: Query<TupleFoo>, _: RouteContext<()>) -> Result<Response> {
+///     // you won't even get here
+///     let TupleFoo ( foo ) = req.into_inner();
+///     // rest code
 /// }
 ///
 /// ```
@@ -121,6 +118,7 @@ where
     pub fn from(req: &Request, ctx: &RouteContext<()>) -> Result<Self, Error> {
         Self::new(None, req, ctx)
     }
+
     #[doc(hidden)]
     pub fn from_method(
         method: Method,

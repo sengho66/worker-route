@@ -1,5 +1,5 @@
 use std::future::Future;
-use worker::{Method, Request, Response, Result as CfResult, RouteContext, Router};
+use worker::{console_debug, Method, Request, Response, Result as CfResult, RouteContext, Router};
 
 type Cb = fn(Router<'static, ()>) -> Router<'static, ()>;
 
@@ -12,6 +12,7 @@ pub struct RouteHandler<U> {
     pattern: &'static str,
 }
 
+#[doc(hidden)]
 impl<U> RouteHandler<U>
 where
     for<'a> U: Future<Output = CfResult<Response>> + 'a,
@@ -31,11 +32,6 @@ where
     }
 }
 
-// impl Handlers {
-//     fn new() -> Self {
-//         Self(Vec::new())
-//     }
-// }
 /// A trait that's implemented for `RouteHandler` that you can call to configure
 /// the routes and pattern.
 ///
@@ -91,7 +87,12 @@ impl<U> Configure<U> for Router<'static, ()> {
             Method::Patch => self.patch_async(pattern, fn_),
             Method::Delete => self.delete_async(pattern, fn_),
             Method::Options => self.options_async(pattern, fn_),
-            _ => panic!(),
+            _ => {
+                // the method variant is passed from the macro module
+                // it should not panic by right.
+                console_debug!("{:?} is not supported.", method);
+                panic!()
+            }
         }
     }
 }
@@ -136,7 +137,7 @@ impl<U> Configure<U> for Router<'static, ()> {
 /// }
 ///
 /// // wrapper function
-/// fn configure(router: Router<'static, ()>) -> Router<'static, ()> {
+/// fn init_routes(router: Router<'static, ()>) -> Router<'static, ()> {
 ///     router.configure(bar).configure(foo).configure(person)
 /// }
 ///
@@ -146,8 +147,8 @@ impl<U> Configure<U> for Router<'static, ()> {
 ///     // before
 ///     // router.configure(bar).configure(foo).configure(person).run(req, env).await
 ///     // after
-///     // router.service(configure).run(req, env).await
-///     router.service(configure).run(req, env).await
+///     // router.service(init_routes).run(req, env).await
+///     router.service(init_routes).run(req, env).await
 /// }
 ///
 /// ```

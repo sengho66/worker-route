@@ -51,7 +51,7 @@
 //!     Response::from_json(&req.into_inner())
 //! }
 //!
-//! fn configure(router: Router<'static, ()>) -> Router<'static, ()> {
+//! fn init_routes(router: Router<'static, ()>) -> Router<'static, ()> {
 //!     router
 //!         .configure(bar)
 //!         .configure(foo)
@@ -62,7 +62,7 @@
 //! #[event(fetch)]
 //! pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
 //!     let router = Router::new();
-//!     router.service(configure).run(req, env).await
+//!     router.service(init_routes).run(req, env).await
 //! }
 //! ```
 //!
