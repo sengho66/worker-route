@@ -1,7 +1,10 @@
 [package]
-name = "worker-macro"
+name = "worker-route-macro"
+authors = ["Seng Ho <sengho0606@gmail.com>"]
 version = "0.0.1"
 edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/sengho66/worker-route/tree/main/macro"
 
 [lib]
 proc-macro = true

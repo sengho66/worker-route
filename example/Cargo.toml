@@ -3,7 +3,7 @@ name = "worker-route-example"
 version = "0.0.1"
 publish = false
 edition = "2021"
-private = true
+
 [lib]
 crate-type = ["cdylib"]
 
