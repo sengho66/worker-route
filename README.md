@@ -1,7 +1,7 @@
 # worker-route
 
 
-Add handlers to CF Router with macro attribute.
+Worker Route is a crate designed for usage in Cloudflare Workers.
 
 ## Examples
 ```rust
@@ -68,4 +68,14 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 }
 ```
 
+## Features
+- Add routes to handler with macro attribute
+- Extract query parameters or path from URL
 
+## Limitations
+Currently only async methods are supported.
+If you have a synchronous get method, it will be set to `.get_async()` instead of `.get()`.
+
+
+
+License: Apache-2.0
