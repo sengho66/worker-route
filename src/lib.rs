@@ -1,6 +1,6 @@
 //!
-//! Add handlers to CF Router with macro attribute.
-//!
+//! Worker Route is a crate designed for usage in Cloudflare Workers.
+//! 
 //! # Examples
 //! ```
 //! use serde::{Deserialize, Serialize};
@@ -66,7 +66,15 @@
 //! }
 //! ```
 //!
+//! # Features
+//! - Add routes to handler with macro attribute
+//! - Extract query parameters or path from URL
 //!
+//! # Limitations
+//! Currently only async methods are supported.
+//! If you have a synchronous get method, it will be set to `.get_async()` instead of `.get()`.
+//! 
+//! 
 mod error;
 mod query;
 mod route;
@@ -76,7 +84,7 @@ mod wrapper;
 pub use query::Query;
 pub use route::{Configure, RouteHandler, Service};
 pub use worker::Result as CfResult;
-pub use worker_macro::{delete, get, head, options, patch, post, put};
+pub use worker_route_macro::{delete, get, head, options, patch, post, put};
 
 #[doc(hidden)]
 pub use wrapper::{_private_wrap, _private_wrap_with_query, _private_wrap_with_req};
