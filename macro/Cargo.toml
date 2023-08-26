@@ -1,0 +1,12 @@
+[package]
+name = "worker-macro"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0.28", features = ["full", "visit"] }
+proc-macro2 = "1.0.51"
+quote = "1.0.23"
