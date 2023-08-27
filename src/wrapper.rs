@@ -9,13 +9,13 @@ use crate::{
 };
 
 type QueryRes<T> = Result<Query<T>, Error>;
-type WithQuery<T, U> = fn(Query<T>, RouteContext<()>) -> U;
-type WithReq<T, U> = fn(Query<T>, Request, RouteContext<()>) -> U;
+type WithQuery<D, T, U> = fn(Query<T>, RouteContext<D>) -> U;
+type WithReq<D, T, U> = fn(Query<T>, Request, RouteContext<D>) -> U;
 type Res = Result<CfResult<Response>, Error>;
 
-enum FnType<T, U> {
-    WithQuery(WithQuery<T, U>),
-    WithReq(WithReq<T, U>),
+enum FnType<D, T, U> {
+    WithQuery(WithQuery<D, T, U>),
+    WithReq(WithReq<D, T, U>),
 }
 
 trait Responder {
@@ -31,15 +31,15 @@ impl Responder for Res {
     }
 }
 
-struct Wrapper<T, U> {
-    ctx: RouteContext<()>,
-    fn_: FnType<T, U>,
+struct Wrapper<D, T, U> {
+    ctx: RouteContext<D>,
+    fn_: FnType<D, T, U>,
     req: Request,
     res: QueryRes<T>,
 }
 
-impl<T, U> Wrapper<T, U> {
-    fn new(res: QueryRes<T>, req: Request, ctx: RouteContext<()>, fn_: FnType<T, U>) -> Self {
+impl<D, T, U> Wrapper<D, T, U> {
+    fn new(res: QueryRes<T>, req: Request, ctx: RouteContext<D>, fn_: FnType<D, T, U>) -> Self {
         Self { req, res, ctx, fn_ }
     }
 
@@ -59,11 +59,11 @@ impl<T, U> Wrapper<T, U> {
 }
 
 #[allow(unused)]
-pub async fn _private_wrap<U>(
+pub async fn _private_wrap<D, U>(
     method: Method,
     req: Request,
-    ctx: RouteContext<()>,
-    fn_: fn(Request, RouteContext<()>) -> U,
+    ctx: RouteContext<D>,
+    fn_: fn(Request, RouteContext<D>) -> U,
 ) -> CfResult<Response>
 where
     for<'a> U: Future<Output = CfResult<Response>> + 'a,
@@ -74,11 +74,11 @@ where
     }
 }
 
-pub async fn _private_wrap_with_query<T, U>(
+pub async fn _private_wrap_with_query<D, T, U>(
     method: Method,
     req: Request,
-    ctx: RouteContext<()>,
-    fn_: fn(Query<T>, RouteContext<()>) -> U,
+    ctx: RouteContext<D>,
+    fn_: fn(Query<T>, RouteContext<D>) -> U,
 ) -> CfResult<Response>
 where
     T: for<'a> Deserialize<'a> + Debug + for<'a> serde::Deserialize<'a>,
@@ -93,11 +93,11 @@ where
     wrapper.res().await.res()
 }
 
-pub async fn _private_wrap_with_req<T, U>(
+pub async fn _private_wrap_with_req<D, T, U>(
     method: Method,
     req: Request,
-    ctx: RouteContext<()>,
-    fn_: fn(Query<T>, Request, RouteContext<()>) -> U,
+    ctx: RouteContext<D>,
+    fn_: fn(Query<T>, Request, RouteContext<D>) -> U,
 ) -> CfResult<Response>
 where
     T: for<'a> Deserialize<'a> + Debug + for<'a> serde::Deserialize<'a>,
@@ -112,58 +112,3 @@ where
 
     wrapper.res().await.res()
 }
-
-// Ok(query_) => match fn_(query_, ctx).await {
-//     Ok(res) => Ok(res),
-//     Err(err) => ErrorJson::from(err).into(),
-// },
-// Err(err
-
-// pub fn wrap_(
-//     method: Method,
-//     req: Request,
-//     ctx: RouteContext<()>,
-//     fn_: fn(Request, RouteContext<()>) -> CfResult<Response>,
-// ) -> CfResult<Response> {
-//     match fn_(req, ctx) {
-//         Ok(query_) => Ok(query_),
-//         Err(err) => ErrorJson::from(err).into(),
-//     }
-// }
-
-// pub fn wrap_with_query_<T, U>(
-//     method: Method,
-//     req: Request,
-//     ctx: RouteContext<()>,
-//     fn_: fn(Query<T>, RouteContext<()>) -> U,
-// ) -> CfResult<Response>
-// where
-//     T: for<'a> Deserialize<'a> + Debug + for<'a> serde::Deserialize<'a>,
-// {
-//     let wrapper = Wrapper::new(
-//         Query::from_method(method, &req, &ctx),
-//         req,
-//         ctx,
-//         FnType::WithQuery(fn_),
-//     );
-//     wrapper.fn_()
-// }
-
-// pub fn wrap_with_req_<T, U>(
-//     method: Method,
-//     req: Request,
-//     ctx: RouteContext<()>,
-//     fn_: fn(Query<T>, Request, RouteContext<()>) -> U,
-// ) -> CfResult<Response>
-// where
-//     T: for<'a> Deserialize<'a> + Debug + for<'a> serde::Deserialize<'a>,
-// {
-//     let wrapper = Wrapper::new(
-//         Query::from_method(method, &req, &ctx),
-//         req,
-//         ctx,
-//         FnType::WithReq(fn_),
-//     );
-
-//     wrapper.res().res()
-// }

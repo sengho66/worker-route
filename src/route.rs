@@ -1,24 +1,21 @@
 use std::future::Future;
 use worker::{console_debug, Method, Request, Response, Result as CfResult, RouteContext, Router};
 
-type Cb = fn(Router<'static, ()>) -> Router<'static, ()>;
+type Cb<D> = fn(Router<'static, D>) -> Router<'static, D>;
 
 #[allow(unused)]
 #[doc(hidden)]
-pub struct RouteHandler<U> {
-    fn_: fn(Request, RouteContext<()>) -> U,
+pub struct RouteHandler<D, U> {
+    fn_: fn(Request, RouteContext<D>) -> U,
     is_async: bool,
     method: Method,
     pattern: &'static str,
 }
 
 #[doc(hidden)]
-impl<U> RouteHandler<U>
-where
-    for<'a> U: Future<Output = CfResult<Response>> + 'a,
-{
+impl<D, U> RouteHandler<D, U> {
     pub fn new(
-        fn_: fn(Request, RouteContext<()>) -> U,
+        fn_: fn(Request, RouteContext<D>) -> U,
         pattern: &'static str,
         is_async: bool,
         method: Method,
@@ -61,17 +58,20 @@ where
 ///
 /// ```
 ///
-pub trait Configure<U> {
-    fn configure(self, fns_: fn() -> RouteHandler<U>) -> Router<'static, ()>
-    where
-        for<'a> U: Future<Output = CfResult<Response>> + 'a;
+pub trait Configure<D> {
+    fn configure(
+        self,
+        fns_: RouteFn<D, impl Future<Output = CfResult<Response>> + 'static>,
+    ) -> Router<'static, D>;
 }
 
-impl<U> Configure<U> for Router<'static, ()> {
-    fn configure(self, fns_: fn() -> RouteHandler<U>) -> Router<'static, ()>
-    where
-        for<'a> U: Future<Output = CfResult<Response>> + 'a,
-    {
+type RouteFn<D, U> = fn() -> RouteHandler<D, U>;
+
+impl<D: 'static> Configure<D> for Router<'static, D> {
+    fn configure(
+        self,
+        fns_: RouteFn<D, impl Future<Output = CfResult<Response>> + 'static>,
+    ) -> Router<'static, D> {
         let RouteHandler {
             fn_,
             pattern,
@@ -152,12 +152,12 @@ impl<U> Configure<U> for Router<'static, ()> {
 /// }
 ///
 /// ```
-pub trait Service {
-    fn service(self, fns_: Cb) -> Router<'static, ()>;
+pub trait Service<D> {
+    fn service(self, fns_: Cb<D>) -> Router<'static, D>;
 }
 
-impl Service for Router<'static, ()> {
-    fn service(self, fns_: Cb) -> Router<'static, ()> {
+impl<D> Service<D> for Router<'static, D> {
+    fn service(self, fns_: Cb<D>) -> Router<'static, D> {
         fns_(self)
     }
 }

@@ -43,6 +43,36 @@ use worker::RouteContext;
 ///
 /// ```
 ///
+/// # Notes
+/// Request can be an ommited from the parameter too.
+/// When ommitting either of them, the sequence must always be in the correct order.
+///
+/// The correct orders are:
+/// - (`Request`, `RouteContext<D>`)
+/// - (`Query<T>`, `RouteContext<D>`)
+/// - (`Query<T>`, `Request`, `RouteContext<D>`)
+///
+/// ```
+/// use serde::{Deserialize, Serialize};
+/// use worker::{Response, Result, RouteContext};
+/// use worker_route::{get, Query};
+///
+/// #[derive(Debug, Serialize, Deserialize)]
+/// struct Foo {
+///     foo: String,
+/// }
+///
+/// #[get("/foo-query")]
+/// async fn without_req(req: Query<Foo>, _: RouteContext<()>) -> Result<Response> {
+///     // rest code
+/// }
+///
+/// #[get("/foo-with-request")]
+/// async fn with_request(req: Query<Foo>, _: Request, _: RouteContext<()>) -> Result<Response> {
+///     // rest code
+/// }
+/// ```
+///
 pub struct Query<T>(T);
 impl<T> Query<T>
 where
@@ -53,7 +83,7 @@ where
         self.0
     }
 
-    fn collect_fields(fields: &'static [&'static str], ctx: &RouteContext<()>) -> Vec<String> {
+    fn collect_fields<D>(fields: &'static [&'static str], ctx: &RouteContext<D>) -> Vec<String> {
         let mut map = Vec::with_capacity(fields.len());
         for i in fields {
             if let Some(p) = ctx.param(i) {
@@ -66,11 +96,14 @@ where
 
     #[allow(unused)]
     // method is unusedf or now
-    fn new(method: Option<Method>, req: &Request, ctx: &RouteContext<()>) -> Result<Self, Error> {
+    fn new<D>(method: Option<Method>, req: &Request, ctx: &RouteContext<D>) -> Result<Self, Error> {
         // get the fields from the supplied <T> which is a struct
         // struct Foo { name: String, age: usize }
         // ["name", "age"]
         let fields = struct_fields::<T>();
+
+        // NOTE: it should not panic by unwrapping it for whatever reason
+        // wouldn't even get this far if it panics because it would have done much earlier
         let url = req.url().unwrap();
 
         // get fields from path first
@@ -115,15 +148,16 @@ where
     /// }
     ///
     /// ```
-    pub fn from(req: &Request, ctx: &RouteContext<()>) -> Result<Self, Error> {
+    pub fn from<D>(req: &Request, ctx: &RouteContext<D>) -> Result<Self, Error> {
         Self::new(None, req, ctx)
     }
 
+    // used by macro, do not call this when constructing the query manually
     #[doc(hidden)]
-    pub fn from_method(
+    pub fn from_method<D>(
         method: Method,
         req: &Request,
-        ctx: &RouteContext<()>,
+        ctx: &RouteContext<D>,
     ) -> Result<Self, Error> {
         Self::new(Some(method), req, ctx)
     }
