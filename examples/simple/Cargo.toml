@@ -1,5 +1,5 @@
 [package]
-name = "worker-route-example"
+name = "worker-route-example-simple"
 version = "0.0.1"
 publish = false
 edition = "2021"
@@ -11,4 +11,4 @@ crate-type = ["cdylib"]
 worker = "0.0.18"
 serde = { version = "1.0.185", features = ["derive"] }
 serde_json = "1.0.105"
-worker-route = { path = "../" }
+worker-route = { path = "../../" }

@@ -805,7 +805,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "worker-route-example"
+name = "worker-route-example-simple"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "worker",
+ "worker-route",
+]
+
+[[package]]
+name = "worker-route-example-with-data"
 version = "0.0.1"
 dependencies = [
  "serde",

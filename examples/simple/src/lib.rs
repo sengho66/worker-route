@@ -8,8 +8,8 @@ struct Bar {
 }
 
 #[get("/bar")]
-async fn bar(req: Query<Bar>, _: RouteContext<()>) -> Result<Response> {
-    Response::from_json(&req.into_inner())
+async fn bar(query: Query<Bar>, _: RouteContext<()>) -> Result<Response> {
+    Response::from_json(&query.into_inner())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,19 +18,19 @@ struct Foo {
 }
 
 #[get("/foo")]
-async fn foo(req: Query<Foo>, _: RouteContext<()>) -> Result<Response> {
-    Response::from_json(&req.into_inner())
+async fn foo(query: Query<Foo>, _: RouteContext<()>) -> Result<Response> {
+    Response::from_json(&query.into_inner())
 }
-#[derive(Debug, Serialize, Deserialize)]
 
+#[derive(Debug, Serialize, Deserialize)]
 struct FooBar {
     foo: String,
     bar: String,
 }
 
 #[get("/foo-bar")]
-async fn foo_bar(req: Query<FooBar>, _: Request, _: RouteContext<()>) -> Result<Response> {
-    Response::from_json(&req.into_inner())
+async fn foo_bar(query: Query<FooBar>, _: Request, _: RouteContext<()>) -> Result<Response> {
+    Response::from_json(&query.into_inner())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -40,8 +40,8 @@ struct Person {
 }
 
 #[post("/person/:name/:age")]
-async fn person(req: Query<Person>, _: RouteContext<()>) -> Result<Response> {
-    Response::from_json(&req.into_inner())
+async fn person(query: Query<Person>, _: RouteContext<()>) -> Result<Response> {
+    Response::from_json(&query.into_inner())
 }
 
 fn init_routes(router: Router<'static, ()>) -> Router<'static, ()> {
@@ -55,5 +55,6 @@ fn init_routes(router: Router<'static, ()>) -> Router<'static, ()> {
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
     let router = Router::new();
+
     router.service(init_routes).run(req, env).await
 }

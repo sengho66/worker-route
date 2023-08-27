@@ -16,4 +16,4 @@ serde_qs = "0.12.0"
 worker-route-macro = { version = "0.0.1", path = "./worker-route-macro" }
 
 [workspace]
-members = ["worker-route-macro", "example"]
+members = ["worker-route-macro", "examples/simple", "examples/with-data"]
