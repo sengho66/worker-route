@@ -13,7 +13,7 @@ serde = { version = "1.0.187", features = ["derive"] }
 serde_json = "1.0.105"
 futures = "0.3.28"
 serde_qs = "0.12.0"
-worker-route-macro = { version = "0.0.1", path = "./worker-route-macro" }
+worker-route-macro = { path = "worker-route-macro", version = "0.0.1" }
 
 [workspace]
 members = ["worker-route-macro", "examples/simple", "examples/with-data"]
