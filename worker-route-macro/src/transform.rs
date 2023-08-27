@@ -34,7 +34,7 @@ impl FnWrapper {
         let query = is_query.to_token_stream();
         let asyncness = sig.asyncness;
         let is_async = asyncness.is_some();
-        let wrapper = wrapper(&query.to_string(), args.len(), is_async);
+        let wrapper = wrapper(&query.to_string(), args.len());
         let ret = sig.output;
         let path = path;
 
@@ -54,10 +54,7 @@ impl FnWrapper {
     }
 }
 
-fn wrapper(query: &str, len: usize, is_async: bool) -> TokenStream {
-    if !is_async {
-        return quote::quote!(::worker_route::_private_wrap_);
-    }
+fn wrapper(query: &str, len: usize) -> TokenStream {
     match len.cmp(&2) {
         // TODO
         // need a proper error message
