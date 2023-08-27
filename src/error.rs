@@ -22,6 +22,10 @@ impl Error {
     pub fn new(v: String) -> Self {
         Self(worker::Error::from(v))
     }
+
+    pub fn into_inner(self) -> worker::Error {
+        self.0
+    }
 }
 
 impl From<serde_json::Error> for Error {
