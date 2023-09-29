@@ -1,104 +1,81 @@
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{parse2, FnArg, TypePath};
-
 use crate::error::Error;
-use crate::route::Method;
+use crate::route::{gen_router, Route};
 use crate::transform::FnWrapper;
 
-pub fn expand(attrs_: TokenStream, items: TokenStream, method: Method) -> TokenStream {
-    let path = match get_path(attrs_) {
-        Ok(p) => match p {
-            syn::Lit::Str(s) => s.value(),
-            _ => todo!(),
-        },
-        Err(e) => return method.to_compile_error(e.inner()),
-    };
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{parse2, parse_quote};
 
-    let method = method.to_token();
-    let fn_ = expand_fn(items).unwrap();
-    let ctx = fn_.sig.inputs.last();
-    let (parent, child) = get_generic(ctx.unwrap());
-    let FnWrapper {
-        stmts,
-        origin,
-        asyncness,
-        name,
-        internal,
-        ret,
-        path,
-        args,
-        wrapper,
-        vis,
-        is_async,
-    } = FnWrapper::new(fn_, path);
-
-    // struct CtxData;
-    // struct FooQuery;
-    // fn foo(req: Query<FooQuery>, ctx: RouteContext<CtxData>) -> Result<Response>;
-    //
-    // becomes
-    // fn foo() -> RouteHandler<CtxData, impl Future<Output = Result<Response>>>;
-    //
-    // generated two additional functions
-    // fn internal_foo_(req, Request, RouteContext<CtxData) -> Result<Response>;
-    //
-    // below is the original function renamed to internal_foo
-    // fn internal_foo(req: Query<FooQuery>, ctx: RouteContext<CtxData>) -> Result<Response>;
-    //
-    // run cargo expand to view what the additional functions do
-
-    let expanded = quote! {
-        #[allow(clippy::unused_async)]
-        #asyncness #vis fn #name(#args) #ret {
-            #(#stmts)*
-        }
-        #[allow(clippy::unused_async)]
-        #asyncness #vis fn #internal(req: ::worker::Request, ctx: #parent) #ret {
-            #wrapper(#method, req, ctx, #name).await
-        }
-        #[allow(clippy::unused_async)]
-        #vis fn #origin() -> ::worker_route::RouteHandler<#child,
-        impl ::core::future::Future<Output = ::worker_route::CfResult<::worker::Response>>> {
-            ::worker_route::RouteHandler::new(#internal, #path, #is_async, #method)
-        }
-    };
-
-    expanded
-}
-
-pub fn get_path(attrs: TokenStream) -> Result<syn::Lit, Error> {
-    Ok(parse2::<syn::Lit>(attrs)?)
-}
-
+#[allow(clippy::module_name_repetitions)]
 pub fn expand_fn(items: TokenStream) -> Result<syn::ItemFn, Error> {
     Ok(parse2::<syn::ItemFn>(items)?)
 }
 
+// Code is unreadable atm, will be refactored in the near future!
+pub fn expand(items: TokenStream, route: &Route) -> TokenStream {
+    let path = route.path.as_ref().unwrap();
+    let fn_ = expand_fn(items).unwrap();
+    let cors = route.cors();
+    let FnWrapper {
+        asyncness,
+        path,
+        name,
+        ret,
+        vis,
+        stmts,
+        args,
+        wrapper,
+        route_context,
+        data,
+    } = FnWrapper::new(&fn_, path, &cors);
 
-// given an fn
-// fn foo(req: Query<FooQuery>, ctx: RouteContext<CtxData>) -> Result<Response>
-// get_generic() is used to extract RouteContext<CtxData>
-// returning the parent and the child
-fn get_generic(ctx: &FnArg) -> (TokenStream, TokenStream) {
-    match ctx {
-        FnArg::Typed(ty) => {
-            let parent = ty.ty.to_token_stream();
-            let parent = parse2::<TypePath>(parent.clone()).unwrap();
-            let child = parent.path.segments[0].arguments.to_token_stream();
-            let child = parse2::<syn::AngleBracketedGenericArguments>(child.clone()).unwrap();
-            let child = child.args.last().unwrap().to_token_stream();
+    let attr = if asyncness.is_some() {
+        Some(quote!(#[allow(clippy::unused_async)]))
+    } else {
+        None
+    };
+    let wrapper = match wrapper {
+        Ok(w) => w,
+        Err(e) => return e,
+    };
+    let attrs = &fn_.attrs;
 
-            (parent.to_token_stream(), child)
+    let routes = route.methods.iter().enumerate().map(|(i, v)| {
+        gen_router(
+            asyncness,
+            &cors,
+            path,
+            &v.value(),
+            route.wrap,
+            Some((i, route.methods.len())),
+        )
+    });
+
+    let expanded = parse_quote! {
+        #(#attrs)*
+        #[allow(non_camel_case_types, missing_docs)]
+        pub struct #name;
+        impl ::worker_route::__private::RouteFactory<#data> for #name {
+            fn register(
+                self,
+                router__: ::worker::Router<'_, #data>
+            ) -> ::worker::Router<'_, #data> {
+                use ::worker_route::__private::AddHandler;
+                pub #asyncness fn __handler(
+                    req__: ::worker::Request,
+                    ctx__: #route_context
+                ) -> ::worker::Result<::worker::Response> {
+                    #attr
+                    #[allow(missing_docs)]
+                    #vis #asyncness fn #name(#args) #ret {
+                        #(#stmts)*
+                    }
+                    #wrapper
+                }
+                #(#routes)*
+            }
         }
-        // don't worry about it, you only get this in your development environment
-        // the correct arguments sequence are
-        // (Request, RouteContext<D>)
-        // or
-        // (Query<T>, RouteContext<D>)
-        // or
-        // (Query<T>, Request, RouteContext<D>)
-        // the sequence of the above must be in the correct order
-        _ => panic!(),
-    }
+    };
+
+    expanded
 }
