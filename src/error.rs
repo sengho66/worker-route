@@ -1,96 +1,145 @@
-use serde::Serialize;
-use serde_json::to_value;
-use std::fmt::{Debug, Display};
-use worker::{Response, Result as CfResult};
+use crate::http::{
+    ContentType, ResponseError, {HttpRequest, HttpResponse, ResponseBuilder},
+};
+use core::fmt::{Debug, Display};
+use http::{
+    header::{ToStrError, ACCEPT, CONTENT_TYPE},
+    StatusCode,
+};
+use mime::STAR_STAR;
+use serde_json::{json, Value};
+use worker::Headers;
 
-#[derive(Serialize, Clone, Debug)]
-pub struct ErrorJson {
-    status: u16,
+/// Top level Worker-Route Error.
+#[derive(Debug)]
+pub struct Error {
     message: String,
+    status_code: StatusCode,
+    cause: ErrorCause,
 }
 
+/// All possible Error variants that may occur when working with [`worker_route`](crate).
 #[derive(Debug)]
-pub struct Error(worker::Error);
+pub enum ErrorCause {
+    /// Errors occured from [`worker::Error`](https://docs.rs/worker/latest/worker/enum.Error.html)
+    Worker(worker::Error),
+    /// Errors occured from [`Query`](crate::Query)
+    Query,
+    /// Errors occured from [`HttpHeaders`](crate::http::headers::HttpHeaders) operations
+    Header,
+    /// Errors occured from [`ResponseBuilder`](crate::http::ResponseBuilder)
+    Json,
+}
 
-impl ErrorJson {
-    fn new(message: String, status: u16) -> Self {
-        ErrorJson { status, message }
+impl Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.message)
     }
 }
 
 impl Error {
-    pub fn new(v: String) -> Self {
-        Self(worker::Error::from(v))
+    /// Creates a new [`Error`].
+    pub(crate) fn new(message: String, status_code: StatusCode, cause: ErrorCause) -> Self {
+        Self {
+            message,
+            status_code,
+            cause,
+        }
     }
 
-    pub fn into_inner(self) -> worker::Error {
-        self.0
+    /// Returns the underlying error's occurrence
+    pub fn cause(&self) -> &ErrorCause {
+        &self.cause
+    }
+
+    /// Get the underlying error message.
+    pub fn description(&self) -> String {
+        <Self as ResponseError>::description(self)
+    }
+
+    pub(crate) fn to_error(&self) -> HttpResponse {
+        ResponseBuilder::new(self.status_code).body(self.to_json())
+    }
+
+    pub(crate) fn to_json(&self) -> Value {
+        json!({
+            "message": self.message,
+            "statusCode": self.status_code.as_u16(),
+            "success": false
+        })
     }
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(value: serde_json::Error) -> Self {
-        match value.io_error_kind() {
-            Some(s) => Self(worker::Error::from(s.to_string())),
-            None => Self(worker::Error::from(value.to_string())),
+impl ResponseError for Error {
+    fn error_response(&self, req: HttpRequest) -> HttpResponse {
+        let mut res = self.to_error();
+        accept_json(&req, res.0.headers_mut());
+        res
+    }
+
+    fn status_code(&self) -> StatusCode {
+        self.status_code
+    }
+
+    fn description(&self) -> String {
+        self.message.clone()
+    }
+}
+
+pub fn accept_json(req: &HttpRequest, headers: &mut Headers) {
+    if let Some(accept) = req.headers().get(&ACCEPT) {
+        if accept.contains(STAR_STAR.essence_str()) || accept.contains(ContentType::json().as_str())
+        {
+            let _ = headers.set(
+                CONTENT_TYPE.as_str(),
+                ContentType::json().to_header_value().to_str().unwrap(),
+            );
         }
     }
 }
 
 impl From<Error> for worker::Error {
-    fn from(value: Error) -> Self {
-        value.0
-    }
-}
-
-impl From<Error> for ErrorJson {
-    fn from(value: Error) -> Self {
-        match value.0 {
-            worker::Error::Json(json) => Self::new(json.0, json.1),
-            _ => Self::new(value.0.to_string(), 404u16),
-        }
-    }
-}
-
-impl From<ErrorJson> for String {
-    fn from(value: ErrorJson) -> Self {
-        to_value(value).unwrap().to_string()
+    fn from(err: Error) -> Self {
+        Self::Json((err.to_json().to_string(), err.status_code.into()))
     }
 }
 
 impl From<serde_qs::Error> for Error {
-    fn from(value: serde_qs::Error) -> Self {
-        Self(worker::Error::from(value.to_string()))
-    }
-}
-
-impl From<worker::Error> for ErrorJson {
-    fn from(value: worker::Error) -> Self {
-        match value {
-            worker::Error::Json(json) => Self::new(json.0, json.1),
-            _ => Self::new(value.to_string(), 404u16),
+    fn from(err: serde_qs::Error) -> Self {
+        Self {
+            message: err.description(),
+            status_code: err.status_code(),
+            cause: ErrorCause::Query,
         }
     }
 }
 
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl From<worker::Error> for Error {
+    fn from(err: worker::Error) -> Self {
+        Self {
+            message: err.description(),
+            status_code: err.status_code(),
+            cause: ErrorCause::Worker(err),
+        }
     }
 }
 
-impl Display for ErrorJson {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "ErrorJson {{ message: {}, status: {} }}",
-            self.message, self.status
-        )
+impl From<serde::de::value::Error> for Error {
+    fn from(err: serde::de::value::Error) -> Self {
+        Self {
+            message: err.description(),
+            status_code: err.status_code(),
+            cause: ErrorCause::Query,
+        }
     }
 }
 
-impl From<ErrorJson> for CfResult<Response> {
-    fn from(value: ErrorJson) -> CfResult<Response> {
-        Response::error(value.message, value.status)
+impl From<ToStrError> for Error {
+    fn from(err: ToStrError) -> Self {
+        Self {
+            message: err.description(),
+            status_code: err.status_code(),
+            cause: ErrorCause::Header,
+        }
     }
 }
