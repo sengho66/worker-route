@@ -1,43 +1,34 @@
-use std::future::Future;
-use worker::{console_debug, Method, Request, Response, Result as CfResult, RouteContext, Router};
+use core::future::Future;
+use worker::{console_debug, Method, Request, Response, Result, RouteContext, Router};
 
-type Cb<D> = fn(Router<'static, D>) -> Router<'static, D>;
-
-#[allow(unused)]
-#[doc(hidden)]
-pub struct RouteHandler<D, U> {
-    fn_: fn(Request, RouteContext<D>) -> U,
-    is_async: bool,
-    method: Method,
-    pattern: &'static str,
+// This trait is exactly the same as the one that RouteContext uses to get params
+// This is used mainly for testing-suite
+pub trait Params {
+    fn param_(&self, key: &str) -> Option<&String>;
 }
 
-#[doc(hidden)]
-impl<D, U> RouteHandler<D, U> {
-    pub fn new(
-        fn_: fn(Request, RouteContext<D>) -> U,
-        pattern: &'static str,
-        is_async: bool,
-        method: Method,
-    ) -> Self {
-        Self {
-            fn_,
-            pattern,
-            is_async,
-            method,
-        }
+impl<D> Params for RouteContext<D> {
+    fn param_(&self, key: &str) -> Option<&String> {
+        self.param(key)
     }
 }
 
-/// A trait that's implemented for `RouteHandler` that you can call to configure
-/// the routes and pattern.
+#[doc(hidden)]
+#[allow(clippy::module_name_repetitions)]
+/// Used for code generation, not for public usage.
+pub trait RouteFactory<D> {
+    /// Used for code generation, not for public usage.
+    fn register(self, router: Router<'_, D>) -> Router<'_, D>;
+}
+
+/// Implemented for [`worker::Router`](https://docs.rs/worker/latest/worker/struct.Router.html) to configure the route's pattern.
 ///
 /// # Example
 ///
 /// ```
 /// use serde::{Deserialize, Serialize};
 /// use worker::{event, Env, Request, Response, ResponseBody, Result, RouteContext, Router};
-/// use worker_route::{get, AddRoute, Configure, Query};
+/// use worker_route::{get, Configure, Query, Service};
 ///
 /// #[derive(Debug, Deserialize, Serialize)]
 /// struct Person {
@@ -59,45 +50,19 @@ impl<D, U> RouteHandler<D, U> {
 /// ```
 ///
 pub trait Configure<D> {
-    fn configure(
-        self,
-        fns_: RouteFn<D, impl Future<Output = CfResult<Response>> + 'static>,
-    ) -> Router<'static, D>;
+    fn configure<F: RouteFactory<D>>(self, f: F) -> Self;
 }
 
-type RouteFn<D, U> = fn() -> RouteHandler<D, U>;
-
-impl<D: 'static> Configure<D> for Router<'static, D> {
-    fn configure(
-        self,
-        fns_: RouteFn<D, impl Future<Output = CfResult<Response>> + 'static>,
-    ) -> Router<'static, D> {
-        let RouteHandler {
-            fn_,
-            pattern,
-            method,
-            ..
-        } = fns_();
-        // for now all non-async methods are not supported
-        match method {
-            Method::Head => self.head_async(pattern, fn_),
-            Method::Get => self.get_async(pattern, fn_),
-            Method::Post => self.post_async(pattern, fn_),
-            Method::Put => self.put_async(pattern, fn_),
-            Method::Patch => self.patch_async(pattern, fn_),
-            Method::Delete => self.delete_async(pattern, fn_),
-            Method::Options => self.options_async(pattern, fn_),
-            _ => {
-                // the method variant is passed from the macro module
-                // it should not panic by right.
-                console_debug!("{:?} is not supported.", method);
-                panic!()
-            }
-        }
+impl<D> Configure<D> for Router<'_, D> {
+    fn configure<F: RouteFactory<D>>(self, f: F) -> Self {
+        f.register(self)
     }
 }
 
-/// A trait that's implemented for `Router` that allows you to declutter your main code.
+/// Implemented for [`worker::Router`](https://docs.rs/worker/latest/worker/struct.Router.html) to run external route configuration.
+/// 
+/// This trait is useful for splitting the configuration to a different module.
+///
 /// # Example
 ///
 /// ```
@@ -137,7 +102,7 @@ impl<D: 'static> Configure<D> for Router<'static, D> {
 /// }
 ///
 /// // wrapper function
-/// fn init_routes(router: Router<'static, ()>) -> Router<'static, ()> {
+/// fn init_routes(router: Router<'_, ()>) -> Router<'_, ()> {
 ///     router.configure(bar).configure(foo).configure(person)
 /// }
 ///
@@ -152,12 +117,83 @@ impl<D: 'static> Configure<D> for Router<'static, D> {
 /// }
 ///
 /// ```
-pub trait Service<D> {
-    fn service(self, fns_: Cb<D>) -> Router<'static, D>;
+pub trait Service {
+    fn service<F: FnOnce(Self) -> Self>(self, f: F) -> Self
+    where
+        Self: Sized;
 }
 
-impl<D> Service<D> for Router<'static, D> {
-    fn service(self, fns_: Cb<D>) -> Router<'static, D> {
-        fns_(self)
+impl<D> Service for Router<'_, D> {
+    fn service<F: FnOnce(Self) -> Self>(self, f: F) -> Self {
+        f(self)
+    }
+}
+
+type Handler<D, U> = fn(Request, RouteContext<D>) -> U;
+
+#[doc(hidden)]
+/// Used for code generation, not for public usage.
+pub trait AddHandler<'a, D> {
+    /// Used for code generation, not for public usage.
+    fn register(
+        self,
+        pattern: &str,
+        method: Method,
+        sync_handler: Handler<D, Result<Response>>,
+    ) -> Self;
+    /// Used for code generation, not for public usage.
+    fn register_async<U: Future<Output = Result<Response>> + 'a>(
+        self,
+        pattern: &str,
+        method: Method,
+        async_handler: Handler<D, U>,
+    ) -> Self;
+}
+
+impl<'a, D: 'a> AddHandler<'a, D> for Router<'a, D> {
+    fn register(
+        self,
+        pattern: &str,
+        method: Method,
+        sync_handler: Handler<D, Result<Response>>,
+    ) -> Self {
+        match method {
+            Method::Head => self.head(pattern, sync_handler),
+            Method::Get => self.get(pattern, sync_handler),
+            Method::Post => self.post(pattern, sync_handler),
+            Method::Put => self.put(pattern, sync_handler),
+            Method::Patch => self.patch(pattern, sync_handler),
+            Method::Delete => self.delete(pattern, sync_handler),
+            Method::Options => self.options(pattern, sync_handler),
+            _ => {
+                // the method variant is passed from the macro module
+                // it should not panic by right.
+                console_debug!("{:?} is not supported.", method);
+                panic!()
+            }
+        }
+    }
+
+    fn register_async<U: Future<Output = Result<Response>> + 'a>(
+        self,
+        pattern: &str,
+        method: Method,
+        async_handler: Handler<D, U>,
+    ) -> Self {
+        match method {
+            Method::Head => self.head_async(pattern, async_handler),
+            Method::Get => self.get_async(pattern, async_handler),
+            Method::Post => self.post_async(pattern, async_handler),
+            Method::Put => self.put_async(pattern, async_handler),
+            Method::Patch => self.patch_async(pattern, async_handler),
+            Method::Delete => self.delete_async(pattern, async_handler),
+            Method::Options => self.options_async(pattern, async_handler),
+            _ => {
+                // the method variant is passed from the macro module
+                // it should not panic by right.
+                console_debug!("{:?} is not supported.", method);
+                panic!()
+            }
+        }
     }
 }
