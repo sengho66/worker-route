@@ -1,6 +1,6 @@
 //!
 //! Worker Route is a crate designed for usage in Cloudflare Workers.
-//! 
+//!
 //! # Examples
 //! ```
 //! use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@
 //!     bar: String,
 //! }
 //!
-//! // your function can consists of (Query<T>, Request, RouteContext<()>) too
+//! // your function can consist of (Query<T>, Request, RouteContext<()>) too
 //! #[get("/foo-bar")]
 //! async fn foo_bar(req: Query<FooBar>, _req: Request, _: RouteContext<()>) -> Result<Response> {
 //!     Response::from_json(&req.into_inner())
@@ -51,7 +51,7 @@
 //!     Response::from_json(&req.into_inner())
 //! }
 //!
-//! fn init_routes(router: Router<'static, ()>) -> Router<'static, ()> {
+//! fn init_routes(router: Router<'_, ()>) -> Router<'_, ()> {
 //!     router
 //!         .configure(bar)
 //!         .configure(foo)
@@ -70,21 +70,36 @@
 //! - Add routes to handler with macro attribute
 //! - Extract query parameters or path from URL
 //!
-//! # Limitations
-//! Currently only async methods are supported.
-//! If you have a synchronous get method, it will be set to `.get_async()` instead of `.get()`.
-//! 
-//! 
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::use_self,
+    clippy::similar_names,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_const_for_fn,
+    clippy::return_self_not_must_use
+)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod error;
+pub mod http;
+mod middleware;
 mod query;
 mod route;
 mod utils;
-mod wrapper;
-
-pub use query::Query;
-pub use route::{Configure, RouteHandler, Service};
-pub use worker::Result as CfResult;
-pub use worker_route_macro::{delete, get, head, options, patch, post, put};
 
 #[doc(hidden)]
-pub use wrapper::{_private_wrap, _private_wrap_with_query, _private_wrap_with_req};
+mod internal;
+
+pub use crate::http::{HttpHeaders, HttpRequest, HttpResponse, Responder, ResponseError};
+pub use error::{Error, ErrorCause};
+pub use middleware::Wrap;
+pub use query::Query;
+pub use route::{Configure, Service};
+pub use worker_route_macro::{delete, get, head, options, patch, post, put, route};
+
+#[doc(hidden)]
+pub mod __private {
+    pub use crate::internal::{respond_async, responder, FnType};
+    pub use crate::route::{AddHandler, RouteFactory};
+}
