@@ -10,9 +10,9 @@ use http::StatusCode;
 use serde::Serialize;
 use serde_json::to_vec;
 use worker::worker_sys::web_sys::Response as SysResponse;
-use worker::Response;
 use worker::ResponseBody;
 use worker::WebSocket;
+use worker::{Cors, Response};
 
 /// A wrapper for [`worker::Response`](https://docs.rs/worker/latest/worker/struct.Response.html).
 ///
@@ -52,11 +52,11 @@ impl HttpResponse {
 /// ```
 #[derive(Debug)]
 pub struct ResponseBuilder {
-    pub(crate) body: Body,
-    pub(crate) error: Option<Error>,
-    pub(crate) headers: HttpHeaders,
-    pub(crate) status: Option<StatusCode>,
-    pub(crate) web_socket: Option<WebSocket>,
+    pub(super) body: Body,
+    pub(super) error: Option<Error>,
+    pub(super) headers: HttpHeaders,
+    pub(super) status: Option<StatusCode>,
+    pub(super) web_socket: Option<WebSocket>,
 }
 
 impl Default for ResponseBuilder {
@@ -125,7 +125,7 @@ impl ResponseBuilder {
         set_body!(Body, body.into().as_bytes().into(), self, plaintext)
     }
 
-    pub(crate) fn error(&mut self, err: Error) {
+    pub(super) fn error(&mut self, err: Error) {
         let content_type = ContentType::plaintext();
         self.set_content_type(&content_type);
         self.error = Some(err);
@@ -141,7 +141,7 @@ impl ResponseBuilder {
     ///     header::{HeaderName, HeaderValue},
     ///     HttpResponse, ResponseBuilder, ContentType,
     /// };
-    /// 
+    ///
     /// #[get("/hello_world")]
     /// fn hello_world(_: Request, _: RouteContext<()>) -> worker::Result<HttpResponse> {
     ///     let mut res = ResponseBuilder::init();
@@ -152,7 +152,7 @@ impl ResponseBuilder {
     ///
     ///     Ok(res.body(String::from("Hello world.")))
     /// }
-    ///     
+    ///
     /// ```
     ///
     /// # Errors
@@ -227,6 +227,39 @@ impl ResponseBuilder {
         if self.headers.get(&CONTENT_TYPE).is_none() {
             HeadersOp::Insert.set(&(CONTENT_TYPE, v.to_header_value()), self);
         }
+        self
+    }
+
+    /// Sets this response's cors headers from the `Cors` struct.
+    ///
+    /// # Examples
+    /// ```
+    /// use worker::{Request, Method, RouteContext, Cors};
+    /// use worker_route::{get, http::ContentType, HttpResponse, http::ResponseBuilder};
+    ///
+    /// #[get("/hello_world")]
+    /// fn hello_world(_: Request, _: RouteContext<()>) -> worker::Result<HttpResponse> {
+    ///     let mut res = ResponseBuilder::init();
+    ///     let my_cors = Cors::default()
+    ///        .with_origins(&["*".to_string()])
+    ///        .with_allowed_headers(&["method".to_string(), "origin".to_string()])
+    ///        .with_methods([Method::Get, Method::Options])
+    ///        .with_max_age(86400);
+    ///
+    ///     res.with_cors(&my_cors);
+    ///
+    ///     Ok(res
+    ///         .content_type(&ContentType::plaintext())
+    ///         .body(String::from("Hello world.")))
+    /// }
+    /// ```
+    pub fn with_cors(&mut self, cors: &Cors) -> &mut Self {
+        if let Err(err) = self.headers_mut().apply_cors(cors) {
+            self.error(err.into());
+
+            return self;
+        }
+
         self
     }
 
