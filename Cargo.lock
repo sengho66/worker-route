@@ -126,6 +126,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "cookie"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7efb37c3e1ccb1ff97164ad95ac1606e8ccd35b3fa0a7d99a304c7f4a428cc24"
+dependencies = [
+ "time",
+ "version_check",
+]
+
+[[package]]
+name = "deranged"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2696e8a945f658fd14dc3b87242e6b80cd0f36ff04ea560fa39082368847946"
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -272,6 +298,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
 name = "libc"
 version = "0.2.147"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,6 +326,12 @@ name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
+
+[[package]]
+name = "mime"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
 name = "miniz_oxide"
@@ -336,6 +374,12 @@ checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
 dependencies = [
  "regex",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
 name = "percent-encoding"
@@ -587,6 +631,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "time"
+version = "0.3.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17f6bb557fd245c28e6411aa56b6403c689ad95061f50e4be16c274e70a17e48"
+dependencies = [
+ "deranged",
+ "itoa",
+ "serde",
+ "time-core",
+ "time-macros",
+]
+
+[[package]]
+name = "time-core"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7300fbefb4dadc1af235a9cef3737cea692a9d97e1b9cbcd4ebdae6f8868e6fb"
+
+[[package]]
+name = "time-macros"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a942f44339478ef67935ab2bbaec2fb0322496cf3cbe84b261e06ac3814c572"
+dependencies = [
+ "time-core",
+]
+
+[[package]]
 name = "tinyvec"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -642,6 +714,12 @@ dependencies = [
  "idna",
  "percent-encoding",
 ]
+
+[[package]]
+name = "version_check"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "wasm-bindgen"
@@ -794,9 +872,13 @@ dependencies = [
 
 [[package]]
 name = "worker-route"
-version = "0.0.1"
+version = "0.0.3"
 dependencies = [
+ "cookie",
  "futures",
+ "http",
+ "mime",
+ "paste",
  "serde",
  "serde_json",
  "serde_qs",
@@ -805,9 +887,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "worker-route-example-cors"
+version = "0.0.1"
+dependencies = [
+ "lazy_static",
+ "serde",
+ "serde_json",
+ "worker",
+ "worker-route",
+]
+
+[[package]]
+name = "worker-route-example-crypto-fetcher"
+version = "0.0.1"
+dependencies = [
+ "lazy_static",
+ "serde",
+ "serde_json",
+ "worker",
+ "worker-route",
+]
+
+[[package]]
+name = "worker-route-example-custom-error"
+version = "0.0.1"
+dependencies = [
+ "lazy_static",
+ "serde",
+ "serde_json",
+ "worker",
+ "worker-route",
+]
+
+[[package]]
+name = "worker-route-example-custom-response"
+version = "0.0.1"
+dependencies = [
+ "console_error_panic_hook",
+ "lazy_static",
+ "serde",
+ "serde_json",
+ "worker",
+ "worker-route",
+]
+
+[[package]]
 name = "worker-route-example-simple"
 version = "0.0.1"
 dependencies = [
+ "console_error_panic_hook",
+ "lazy_static",
  "serde",
  "serde_json",
  "worker",
@@ -826,8 +955,9 @@ dependencies = [
 
 [[package]]
 name = "worker-route-macro"
-version = "0.0.1"
+version = "0.0.3"
 dependencies = [
+ "paste",
  "proc-macro2",
  "quote",
  "syn",

@@ -1,73 +1,84 @@
+use crate::wrapper::Wrapper;
+
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, ToTokens};
+use quote::ToTokens;
 use syn::{
+    parse2,
     punctuated::Punctuated,
     token::{Async, Comma},
-    FnArg, ItemFn, ReturnType, Stmt, Visibility,
+    FnArg, ItemFn, ReturnType, Stmt, TypePath, Visibility,
 };
 
-pub struct FnWrapper {
-    pub args: Punctuated<FnArg, Comma>,
+pub struct FnWrapper<'a> {
+    pub args: &'a Punctuated<FnArg, Comma>,
     pub asyncness: Option<Async>,
-    pub internal: Ident,
-    pub is_async: bool,
-    pub name: Ident,
-    pub origin: Ident,
-    pub path: String,
-    pub ret: ReturnType,
-    pub stmts: Vec<Stmt>,
-    pub vis: Visibility,
-    pub wrapper: TokenStream,
+    pub data: TokenStream,
+    pub name: &'a Ident,
+    pub path: &'a str,
+    pub ret: &'a ReturnType,
+    pub route_context: TokenStream,
+    pub stmts: &'a [Stmt],
+    pub vis: &'a Visibility,
+    pub wrapper: Result<TokenStream, TokenStream>,
 }
 
-impl FnWrapper {
-    pub fn new(item: ItemFn, path: String) -> Self {
+impl<'a> FnWrapper<'a> {
+    pub fn new(item: &'a ItemFn, path: &'a str, cors: &Option<TokenStream>) -> Self {
         let ItemFn {
             sig, block, vis, ..
         } = item;
-        let stmts = block.stmts;
-        let origin = sig.ident;
-        let name = format_ident!("internal_{}", origin.to_string());
-        let internal = format_ident!("{}_", name.to_string());
-        let args = sig.inputs;
+        let stmts = &block.stmts;
+        let name = &sig.ident;
+        let args = &sig.inputs;
+        let binding = args.last();
+        let ctx = binding.unwrap();
         let is_query = args.first().unwrap();
         let query = is_query.to_token_stream();
         let asyncness = sig.asyncness;
-        let is_async = asyncness.is_some();
-        let wrapper = wrapper(&query.to_string(), args.len());
-        let ret = sig.output;
-        let path = path;
+        let ret = &sig.output;
+        let wrapper = Wrapper::new(query.to_string(), args.len());
+        let (route_context, data) = get_generic(ctx);
+
+        let wrapper = wrapper.to_token(asyncness.is_some(), name, args, cors);
 
         Self {
-            stmts,
-            origin,
-            wrapper,
-            vis,
-            name,
-            asyncness,
-            internal,
-            ret,
-            path,
-            is_async,
             args,
+            asyncness,
+            data,
+            name,
+            path,
+            ret,
+            route_context,
+            stmts,
+            vis,
+            wrapper,
         }
     }
 }
 
-fn wrapper(query: &str, len: usize) -> TokenStream {
-    match len.cmp(&2) {
-        // TODO
-        // need a proper error message
-        std::cmp::Ordering::Less => panic!(),
-        // fn my_fn(req: Request, ctx: RouteContext<()>);
+// given an pub fn
+// pub fn foo(req: Query<FooQuery>, ctx: RouteContext<CtxData>) -> Result<Response>
+// get_generic() is used to extract RouteContext<CtxData>
+// returning the parent and the child
+fn get_generic(ctx: &FnArg) -> (TokenStream, TokenStream) {
+    match ctx {
+        FnArg::Typed(ty) => {
+            let parent = ty.ty.to_token_stream();
+            let parent = parse2::<TypePath>(parent).unwrap();
+            let child = parent.path.segments[0].arguments.to_token_stream();
+            let child = parse2::<syn::AngleBracketedGenericArguments>(child).unwrap();
+            let child = child.args.last().unwrap().to_token_stream();
+
+            (parent.to_token_stream(), child)
+        }
+        // don't worry about it, you only get this in your development environment
+        // the correct arguments sequence are
+        // (Request, RouteContext<D>)
         // or
-        // fn my_fn(req: Query<T>, ctx: RouteContext<()>);
-        std::cmp::Ordering::Equal => match query.contains("Query") {
-            true => quote::quote!(::worker_route::_private_wrap_with_query),
-            _ => quote::quote!(::worker_route::_private_wrap),
-        },
-        // all 3
-        // fn my_fn(req: Query<T>, _:Request, ctx: RouteContext<()>);
-        std::cmp::Ordering::Greater => quote::quote!(::worker_route::_private_wrap_with_req),
+        // (Query<T>, RouteContext<D>)
+        // or
+        // (Query<T>, Request, RouteContext<D>)
+        // the sequence of the above must be in the correct order
+        FnArg::Receiver(_) => panic!(),
     }
 }

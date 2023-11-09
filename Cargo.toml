@@ -1,20 +1,54 @@
 [package]
 name = "worker-route"
 authors = ["Seng Ho <sengho0606@gmail.com>"]
+categories = ["network-programming", "workers", "serverless", "web-programming"]
+description = "Route handlers an data extractor for Cloudflare Workers."
+documentation = "https://docs.rs/worker-route"
 edition = "2021"
+keywords = ["http", "workers", "web", "serverless"]
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/sengho66/worker-route"
-version = "0.0.1"
-description = "Route handlers an data extractor for Cloudflare Workers."
-documentation = "https://docs.rs/worker-route"
+version = "0.0.3"
+exclude = ["tests", "examples", ".config", ".rustfmt.toml", "clippy.toml"]
+
 [dependencies]
 worker = "0.0.18"
+http = "0.2.9"
 serde = { version = "1.0.187", features = ["derive"] }
 serde_json = "1.0.105"
+mime = "0.3.17"
 futures = "0.3.28"
+cookie = { version = "0.17.0", optional = true }
 serde_qs = "0.12.0"
-worker-route-macro = "0.0.1"
+worker-route-macro = { version = "0.0.3", path = "./worker-route-macro" }
+paste = "1.0"
+
+[features]
+queue = ["worker/queue"]
+d1 = ["worker/d1"]
+experimental = []
+cookies = ["cookie"]
+
+[package.metadata.docs.rs]
+# document all features
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace]
-members = ["worker-route-macro", "examples/simple", "examples/with-data"]
+members = [
+    # some examples are yet to be pushed
+    "worker-route-macro",
+    "examples/simple",
+    "examples/with-data",
+    "examples/cors",
+    "examples/custom_response",
+    "examples/custom_error",
+    "examples/crypto-fetcher",
+]
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1
+lto = true
