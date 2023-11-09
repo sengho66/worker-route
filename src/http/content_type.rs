@@ -52,6 +52,8 @@ macro_rules! impl_content_types {
             ///
             /// # Example
             /// ```
+            /// use worker_route::http::ContentType;
+            ///
             /// let html_utf8 = ContentType::html_utf8();
             /// let header_value = html_utf8.to_header_value();
             ///
