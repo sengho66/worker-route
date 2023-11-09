@@ -45,7 +45,7 @@ impl HttpRequest {
 }
 
 impl From<&Request> for HttpRequest {
-/// This is constructed from code generation. Not a public method.
+    /// This is constructed from code generation. Not a public method.
     fn from(req: &Request) -> Self {
         Self {
             headers: req.headers().into(),

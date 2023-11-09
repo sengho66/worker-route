@@ -102,7 +102,7 @@ pub fn struct_fields<T: DeserializeOwned>() -> Result<StructFields, crate::Error
 
     let mut fields = None;
     let mut err = None;
-    let _ = T::deserialize(StructFieldsDeserializer {
+    _ = T::deserialize(StructFieldsDeserializer {
         fields: &mut fields,
         err: &mut err,
     });

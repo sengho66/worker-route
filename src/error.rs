@@ -39,7 +39,7 @@ impl Display for Error {
 
 impl Error {
     /// Creates a new [`Error`].
-    pub(crate) fn new(message: String, status_code: StatusCode, cause: ErrorCause) -> Self {
+    pub(super) fn new(message: String, status_code: StatusCode, cause: ErrorCause) -> Self {
         Self {
             message,
             status_code,
@@ -57,11 +57,11 @@ impl Error {
         <Self as ResponseError>::description(self)
     }
 
-    pub(crate) fn to_error(&self) -> HttpResponse {
+    pub(super) fn to_error(&self) -> HttpResponse {
         ResponseBuilder::new(self.status_code).body(self.to_json())
     }
 
-    pub(crate) fn to_json(&self) -> Value {
+    pub(super) fn to_json(&self) -> Value {
         json!({
             "message": self.message,
             "statusCode": self.status_code.as_u16(),
@@ -90,7 +90,7 @@ pub fn accept_json(req: &HttpRequest, headers: &mut Headers) {
     if let Some(accept) = req.headers().get(&ACCEPT) {
         if accept.contains(STAR_STAR.essence_str()) || accept.contains(ContentType::json().as_str())
         {
-            let _ = headers.set(
+            _ = headers.set(
                 CONTENT_TYPE.as_str(),
                 ContentType::json().to_header_value().to_str().unwrap(),
             );

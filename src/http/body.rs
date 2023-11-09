@@ -67,6 +67,16 @@ macro_rules! set_body {
 
 pub(super) use set_body;
 
+macro_rules! impl_for_body {
+    ($res:ty, $($expr:tt)*) => {
+        impl From<$res> for Body {
+            fn from(b: $res) -> Self {
+                Self::Body(b.$($expr)*)
+            }
+        }
+    };
+}
+
 macro_rules! from_body {
     ($from:tt) => {
         from_body!(&$from, Body, $from, b, b.as_slice().into(), s, s.clone());
@@ -79,7 +89,7 @@ macro_rules! from_body {
     };
     ($from:ty, $to:ty, $from_:tt, $stream:ident, $s:expr) => {
         from_body!($from, $to, $from_, b, b.as_slice().into(), $stream, $s);
-    };
+    };  
     ($from:ty, $to:ty, $from_:tt, $b:ident, $b_:expr, $stream:ident, $s:expr) => {
         impl From<$from> for $to {
             fn from(b: $from) -> Self {
@@ -88,16 +98,6 @@ macro_rules! from_body {
                     $from_::Body($b) => Self::Body($b_),
                     $from_::Stream($stream) => Self::Stream($s),
                 }
-            }
-        }
-    };
-}
-
-macro_rules! impl_for_body {
-    ($res:ty, $($expr:tt)*) => {
-        impl From<$res> for Body {
-            fn from(b: $res) -> Self {
-                Self::Body(b.$($expr)*)
             }
         }
     };

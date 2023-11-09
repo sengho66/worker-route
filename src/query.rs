@@ -30,7 +30,7 @@ use worker::Url;
 /// #[get("/foo-struct")]
 /// async fn struct_foo(req: Query<StructFoo>, _: RouteContext<()>) -> Result<Response> {
 ///     // works
-///     let Foo { foo } = req.into_inner();
+///     let StructFoo { foo } = req.into_inner();
 ///     // rest code
 /// }
 ///
