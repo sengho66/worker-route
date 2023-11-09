@@ -1,21 +1,22 @@
 use super::response::ResponseBuilder;
 use crate::Error;
 
+use http::header::{
+    ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
+    ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_EXPOSE_HEADERS, ACCESS_CONTROL_MAX_AGE,
+};
 use http::{HeaderName, HeaderValue};
 use std::iter::Map;
 use std::ops::{Deref, DerefMut};
 use worker::js_sys::{Array, IntoIter};
 use worker::wasm_bindgen::JsValue;
-use worker::Headers;
+use worker::{Cors, Headers};
 
 type HeaderPair = (HeaderName, HeaderValue);
 pub enum HeadersOp {
     Insert,
     Append,
 }
-
-// pub struct HeaderName(pub(crate) HeaderName_);
-// pub struct HeaderValue(pub(crate) HeaderValue_);
 
 impl HeadersOp {
     pub fn set(&self, header: &HeaderPair, builder: &mut ResponseBuilder) {
@@ -30,15 +31,49 @@ impl HeadersOp {
     }
 }
 
-/// An wrapper for [`worker::Headers`](https://docs.rs/worker/latest/worker/struct.Headers.html) with additional methods.
+/// A wrapper for [`worker::Headers`](https://docs.rs/worker/latest/worker/struct.Headers.html) with additional methods.
 ///
 /// This comes with two additional method which are [`self.len()`](Self::len) and [`self.is_empty()`](Self::is_empty).
 #[derive(Clone, Debug, Default)]
-pub struct HttpHeaders(pub(crate) Headers);
+pub struct HttpHeaders {
+    pub(super) headers: Headers,
+    // Length of elements in the headers.
+    pub(super) len: usize,
+}
 
 impl HttpHeaders {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub(super) fn apply_cors(&mut self, cors: &Cors) -> Result<(), worker::Error> {
+        cors.apply_headers(&mut self.headers)?;
+
+        if self.get(&ACCESS_CONTROL_ALLOW_CREDENTIALS).is_some() {
+            self.len += 1;
+        }
+
+        if self.get(&ACCESS_CONTROL_MAX_AGE).is_some() {
+            self.len += 1;
+        }
+
+        if self.get(&ACCESS_CONTROL_ALLOW_ORIGIN).is_some() {
+            self.len += 1;
+        }
+
+        if self.get(&ACCESS_CONTROL_ALLOW_METHODS).is_some() {
+            self.len += 1;
+        }
+
+        if self.get(&ACCESS_CONTROL_ALLOW_HEADERS).is_some() {
+            self.len += 1;
+        }
+
+        if self.get(&ACCESS_CONTROL_EXPOSE_HEADERS).is_some() {
+            self.len += 1;
+        }
+
+        Ok(())
     }
 
     /// Returns all the values of a header within a `Headers` object with a given name.
@@ -68,7 +103,7 @@ impl HttpHeaders {
 
     /// Returns the number of elements in the headers.
     pub fn len(&self) -> usize {
-        self.0.keys().count()
+        self.len
     }
 
     /// Returns `true` if the headers contain no elements.
@@ -89,7 +124,8 @@ impl HttpHeaders {
     ///
     /// Eg: Header contains invalid header's name or spaces.
     pub fn append(&mut self, name: &HeaderName, value: &HeaderValue) -> Result<(), Error> {
-        self.0.append(name.as_str(), value.to_str()?)?;
+        self.headers.append(name.as_str(), value.to_str()?)?;
+        self.len += 1;
         Ok(())
     }
 
@@ -106,7 +142,8 @@ impl HttpHeaders {
     ///
     /// Eg: Header contains invalid header's name or spaces.
     pub fn set(&mut self, name: &HeaderName, value: &HeaderValue) -> Result<(), Error> {
-        self.0.set(name.as_str(), value.to_str()?)?;
+        self.headers.set(name.as_str(), value.to_str()?)?;
+        self.len += 1;
         Ok(())
     }
 
@@ -123,25 +160,25 @@ impl HttpHeaders {
     ///
     /// Eg: Header contains invalid header's name or spaces.
     pub fn delete(&mut self, name: &HeaderName) -> Result<(), Error> {
-        self.0.delete(name.as_str())?;
+        self.headers.delete(name.as_str())?;
         Ok(())
     }
 
     /// Returns an iterator allowing to go through all key/value pairs contained in this object.
     pub fn entries(&self) -> HeaderIterator {
-        self.0.entries()
+        self.headers.entries()
     }
 
     /// Returns an iterator allowing you to go through all keys of the key/value pairs contained in
     /// this object.
     pub fn keys(&self) -> impl Iterator<Item = String> {
-        self.0.keys()
+        self.headers.keys()
     }
 
     /// Returns an iterator allowing you to go through all values of the key/value pairs contained
     /// in this object.
     pub fn values(&self) -> impl Iterator<Item = String> {
-        self.0.values()
+        self.headers.values()
     }
 }
 
@@ -153,13 +190,13 @@ impl IntoIterator for &HttpHeaders {
     type IntoIter = HeaderIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.entries()
+        self.headers.entries()
     }
 }
 
 impl<'a> From<&'a mut HttpHeaders> for &'a mut Headers {
     fn from(headers: &'a mut HttpHeaders) -> Self {
-        &mut headers.0
+        &mut headers.headers
     }
 }
 
@@ -189,21 +226,31 @@ macro_rules! impl_headers {
     };
 }
 
-impl_headers!(Headers, HttpHeaders);
-impl_headers!(&Headers, HttpHeaders, Self, clone);
-impl_headers!(&HttpHeaders, Headers, headers, headers.0.clone());
-impl_headers!(HttpHeaders, Headers, headers, headers.0);
+// impl_headers!(Headers, HttpHeaders);
+// impl_headers!(&Headers, HttpHeaders, Self, clone);
+impl_headers!(&HttpHeaders, Headers, headers, headers.headers.clone());
+impl_headers!(HttpHeaders, Headers, headers, headers.headers);
+
+impl From<&Headers> for HttpHeaders {
+    fn from(headers: &Headers) -> Self {
+        let len = headers.keys().count();
+        Self {
+            headers: headers.clone(),
+            len,
+        }
+    }
+}
 
 impl Deref for HttpHeaders {
     type Target = Headers;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.headers
     }
 }
 
 impl DerefMut for HttpHeaders {
     fn deref_mut(&mut self) -> &mut Headers {
-        &mut self.0
+        &mut self.headers
     }
 }
