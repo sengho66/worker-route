@@ -66,8 +66,9 @@ macro_rules! route_method {
 ///
 /// # Examples
 /// ```
-/// use worker::{Result, Request, RouteContext, Response, route};
-///
+/// use worker::{Result, Request, RouteContext, Response};
+/// use worker_route::route;
+/// 
 /// #[route("/path", method = "get", method = "post")]
 /// async fn foo(req: Request, ctx: RouteContext<()>) -> Result<Response> {
 ///     Response::empty()
