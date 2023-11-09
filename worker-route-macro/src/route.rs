@@ -321,7 +321,7 @@ impl Route {
     }
 
     fn get_method(&mut self, input: parse::ParseStream, ident: &Ident) -> syn::Result<()> {
-        let _ = input.parse::<Token![=]>()?;
+        _ = input.parse::<Token![=]>()?;
 
         if let Ok(o) = input.parse::<ExprArray>() {
             for i in o.elems {
@@ -347,13 +347,13 @@ impl Route {
             self.insert_method(method, ident.span())?;
         }
 
-        if input.parse::<Token![,]>().is_ok() {}
+        _ = input.parse::<Token![,]>().is_ok();
 
         Ok(())
     }
 
     fn get_cors(&mut self, ident_: &str, input: parse::ParseStream) -> syn::parse::Result<()> {
-        let _ = input.parse::<Token![=]>()?;
+        _ = input.parse::<Token![=]>()?;
         let cors = input.parse::<Ident>()?;
 
         match CorsVariant::to_variant(ident_) {
@@ -365,7 +365,7 @@ impl Route {
             }
         }
 
-        if input.parse::<Token![,]>().is_ok() {}
+        _ = input.parse::<Token![,]>().is_ok();
 
         Ok(())
     }
