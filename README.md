@@ -36,7 +36,7 @@ struct FooBar {
     bar: String,
 }
 
-// your function can consists of (Query<T>, Request, RouteContext<()>) too
+// your function can consist of (Query<T>, Request, RouteContext<()>) too
 #[get("/foo-bar")]
 async fn foo_bar(req: Query<FooBar>, _req: Request, _: RouteContext<()>) -> Result<Response> {
     Response::from_json(&req.into_inner())
@@ -53,7 +53,7 @@ async fn person(req: Query<Person>, _: RouteContext<()>) -> Result<Response> {
     Response::from_json(&req.into_inner())
 }
 
-fn init_routes(router: Router<'static, ()>) -> Router<'static, ()> {
+fn init_routes(router: Router<'_, ()>) -> Router<'_, ()> {
     router
         .configure(bar)
         .configure(foo)
@@ -71,11 +71,6 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
 ## Features
 - Add routes to handler with macro attribute
 - Extract query parameters or path from URL
-
-## Limitations
-Currently only async methods are supported.
-If you have a synchronous get method, it will be set to `.get_async()` instead of `.get()`.
-
 
 
 License: Apache-2.0
